@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Architecture Explorer - Interactive Learning Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0e27, #1a1f3a, #2d1b4e);
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        :root {
+            --primary: #00d4ff;
+            --secondary: #a855f7;
+            --accent: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --header-height: 100px;
+        }
+
+        #header {
+            padding: 20px 30px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(15px);
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, #00d4ff, #a855f7, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 8s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(90deg); }
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 5px;
+        }
+
+        .architecture-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .arch-btn {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1.5px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.95rem;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .arch-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .arch-btn:hover::before {
+            left: 100%;
+        }
+
+        .arch-btn:hover {
+            background: rgba(0, 212, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .arch-btn.active {
+            background: rgba(0, 212, 255, 0.3);
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .main-area {
+            --sidebar-width: min(380px, 32vw);
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+            column-gap: 20px;
+        }
+
+        .main-area.sidebar-collapsed {
+            --sidebar-width: 0px;
+            column-gap: 0;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            position: relative;
+            width: var(--sidebar-width);
+            max-width: var(--sidebar-width);
+            height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease, opacity 0.3s ease;
+            z-index: 10;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-panel.collapsed {
+            width: 0;
+            max-width: 0;
+            padding: 0;
+            opacity: 0;
+            border-width: 0;
+            box-shadow: none;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .panel-close {
+            align-self: flex-end;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #ffffff;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .panel-close:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translate(50%, -50%);
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.4);
+            color: #00d4ff;
+            padding: 10px 18px;
+            border-radius: 999px;
+            cursor: pointer;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            z-index: 20;
+        }
+
+        .sidebar-toggle.visible {
+            display: flex;
+            right: 20px;
+            transform: translate(0, -50%);
+        }
+
+        .info-panel h2 {
+            color: #00d4ff;
+            margin-bottom: 12px;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .info-panel .component-type {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .info-panel .description {
+            line-height: 1.7;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            color: #e0e0e0;
+        }
+
+        .info-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-section h3 {
+            color: #a855f7;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        .info-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-section li {
+            padding: 8px 0;
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.9rem;
+            color: #d0d0d0;
+        }
+
+        .info-section li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 50;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .legend h3 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            margin-right: 12px;
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: rgba(168, 85, 247, 0.1);
+            border: 1.5px solid rgba(168, 85, 247, 0.3);
+            color: #a855f7;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(168, 85, 247, 0.2);
+            transform: scale(1.05);
+        }
+
+        .control-btn.active {
+            background: rgba(168, 85, 247, 0.3);
+            border-color: #a855f7;
+        }
+
+        .scenario-bar {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .scenario-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .scenario-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-right: 8px;
+        }
+
+        .scenario-btn {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1.5px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .scenario-btn:hover {
+            background: rgba(16, 185, 129, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .scenario-btn.active {
+            background: rgba(16, 185, 129, 0.3);
+            border-color: #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .scenario-info {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            padding: 14px 18px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            display: none;
+        }
+
+        .scenario-info.active {
+            display: block;
+        }
+
+        .scenario-info h3 {
+            margin-bottom: 6px;
+            font-size: 1rem;
+            color: #fcd34d;
+        }
+
+        .scenario-info ul {
+            margin-top: 8px;
+            padding-left: 18px;
+        }
+
+        .scenario-info li {
+            margin-bottom: 4px;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .comparison-mode {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 15px 20px;
+            z-index: 50;
+            color: #10b981;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: none;
+        }
+
+        .comparison-mode.active {
+            display: block;
+            animation: slideInLeft 0.4s ease;
+        }
+
+        .comparison-table {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 60px);
+            max-width: 1100px;
+            max-height: calc(100% - 160px);
+            background: rgba(5, 10, 30, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(18px);
+            padding: 24px;
+            display: none;
+            flex-direction: column;
+            z-index: 60;
+        }
+
+        .comparison-table.active {
+            display: flex;
+            animation: fadeIn 0.35s ease;
+        }
+
+        .comparison-table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 16px;
+        }
+
+        .comparison-table-header h3 {
+            margin: 0;
+            color: #00d4ff;
+            font-size: 1.25rem;
+        }
+
+        .comparison-table-header p {
+            margin-top: 6px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
+        .comparison-close {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            border-radius: 10px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.3s ease;
+        }
+
+        .comparison-close:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .comparison-table-body {
+            overflow-y: auto;
+        }
+
+        .comparison-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .comparison-table thead th {
+            text-align: left;
+            padding: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .comparison-table tbody td {
+            padding: 14px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.85);
+            vertical-align: top;
+        }
+
+        .comparison-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .arch-label {
+            font-weight: 600;
+            color: #00d4ff;
+            margin-bottom: 6px;
+        }
+
+        .arch-use-case {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+        }
+
+        .metrics-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 15, 35, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 16px 20px;
+            width: 220px;
+            z-index: 40;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .metrics-panel h3 {
+            font-size: 0.95rem;
+            color: #38bdf8;
+            margin-bottom: 10px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.85rem;
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-row span {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #f472b6;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @keyframes slideInLeft {
+            from { transform: translateX(-100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, 0.4);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 212, 255, 0.6);
+        }
+
+        .connection-badge {
+            display: inline-block;
+            background: rgba(0, 212, 255, 0.15);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin: 4px;
+            transition: all 0.2s;
+        }
+
+        .connection-badge:hover {
+            background: rgba(0, 212, 255, 0.25);
+        }
+
+        @media (max-width: 768px) {
+            .main-area {
+                grid-template-columns: 1fr;
+                grid-template-rows: minmax(0, 1fr) auto;
+                --sidebar-width: 100%;
+                row-gap: 10px;
+            }
+
+            #canvas-container {
+                min-height: 50vh;
+            }
+
+            .info-panel {
+                width: 100%;
+                max-width: 100%;
+                height: auto;
+                max-height: 50vh;
+                border-radius: 12px 12px 0 0;
+                border-left: none;
+                border-top: 1px solid rgba(0, 212, 255, 0.2);
+            }
+
+            .info-panel.collapsed {
+                max-height: 0;
+            }
+            
+            .sidebar-toggle {
+                top: auto;
+                bottom: 10px;
+                right: 12px;
+                transform: none;
+            }
+
+            .sidebar-toggle.visible {
+                right: 12px;
+                transform: none;
+            }
+
+            .metrics-panel {
+                position: relative;
+                top: auto;
+                right: auto;
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div class="header-content">
+            <div>
+                <h1>🔮 RAG Architecture Explorer</h1>
+                <div class="subtitle">Interactive Learning Tool for AI Enthusiasts</div>
+            </div>
+            <div class="architecture-selector">
+                <button class="arch-btn active" onclick="switchArchitecture('naive')">📝 Naive RAG</button>
+                <button class="arch-btn" onclick="switchArchitecture('multimodal')">🎨 Multimodal RAG</button>
+                <button class="arch-btn" onclick="switchArchitecture('hyde')">💡 HyDE</button>
+                <button class="arch-btn" onclick="switchArchitecture('corrective')">✅ Corrective RAG</button>
+                <button class="arch-btn" onclick="switchArchitecture('graph')">🕸️ Graph RAG</button>
+                <button class="arch-btn" onclick="switchArchitecture('hybrid')">🔀 Hybrid RAG</button>
+                <button class="arch-btn" onclick="switchArchitecture('adaptive')">🎯 Adaptive RAG</button>
+                <button class="arch-btn" onclick="switchArchitecture('agentic')">🤖 Agentic RAG</button>
+            </div>
+        </div>
+        <div class="controls" style="margin-top: 15px;">
+            <button class="control-btn active" onclick="toggleAnimation(this)">⏸ Pause Flow</button>
+            <button class="control-btn" id="comparison-button" onclick="toggleComparison(this)">🔄 Compare Architectures</button>
+            <button class="control-btn" onclick="resetView()">↺ Reset View</button>
+        </div>
+        <div class="scenario-bar">
+            <div class="scenario-selector">
+                <div class="scenario-label">Scenario presets:</div>
+                <button class="scenario-btn" data-scenario="support" onclick="selectScenario('support')">🙋 Customer Support</button>
+                <button class="scenario-btn" data-scenario="research" onclick="selectScenario('research')">🔬 Deep Research</button>
+                <button class="scenario-btn" data-scenario="creative" onclick="selectScenario('creative')">🎨 Creative Vision</button>
+            </div>
+            <div class="scenario-info active" id="scenario-info">
+                <h3>Select a scenario to highlight the best-fit architecture.</h3>
+                <p>We’ll auto-focus the recommended pipeline and list what makes it shine.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-area">
+        <div id="canvas-container">
+            <canvas id="network-canvas"></canvas>
+            <div class="comparison-mode" id="comparison-mode">
+                📊 Comparison Mode Active - Click nodes to compare across architectures
+            </div>
+            <div class="comparison-table" id="comparison-table"></div>
+            <div class="metrics-panel" id="metrics-panel"></div>
+        </div>
+
+        <aside class="info-panel" id="info-panel">
+            <button type="button" class="panel-close" onclick="toggleSidebar(false)">✕ Hide Panel</button>
+            <h2 id="component-title">Explore RAG Components</h2>
+            <div class="component-type" id="component-type"></div>
+            <div class="description" id="component-description">
+                Click on any component in the visualization to learn more about its role in the RAG architecture. Watch the animated data flow to understand how information moves through the system.
+            </div>
+            <div id="component-details"></div>
+        </aside>
+
+        <button type="button" class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar(true)">
+            ℹ️ Show Info
+        </button>
+    </div>
+
+    <div class="legend">
+        <h3>Component Types</h3>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #3b82f6;"></div>
+            <span>Input/Query Processing</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #8b5cf6;"></div>
+            <span>Retrieval & Search</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #10b981;"></div>
+            <span>LLM & Generation</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f59e0b;"></div>
+            <span>Storage & Indexing</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ec4899;"></div>
+            <span>Advanced Processing</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('network-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let nodes = [];
+        let edges = [];
+        let particles = [];
+        let hoveredNode = null;
+        let selectedNode = null;
+        let isAnimating = true;
+        let time = 0;
+        let currentArchitecture = 'naive';
+        let comparisonMode = false;
+        let activeScenario = null;
+        let highlightedEdges = new Set();
+        let highlightPhase = 0;
+        let highlightPulse = 0;
+
+        // Architecture button references
+        const archButtons = document.querySelectorAll('.arch-btn');
+        const infoPanelEl = document.getElementById('info-panel');
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+        const mainAreaEl = document.querySelector('.main-area');
+        const comparisonTableEl = document.getElementById('comparison-table');
+        const comparisonButtonEl = document.getElementById('comparison-button');
+        const metricsPanelEl = document.getElementById('metrics-panel');
+        const scenarioButtons = document.querySelectorAll('.scenario-btn');
+        const scenarioInfoEl = document.getElementById('scenario-info');
+        const scenarioInfoDefault = scenarioInfoEl ? scenarioInfoEl.innerHTML : '';
+        let resizeDebounce;
+
+        if (infoPanelEl) {
+            infoPanelEl.addEventListener('transitionend', (event) => {
+                if (['width', 'max-width', 'max-height', 'padding'].includes(event.propertyName)) {
+                    scheduleCanvasResize(10);
+                }
+            });
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            width = canvas.width = container.clientWidth;
+            height = canvas.height = container.clientHeight;
+        }
+
+        function scheduleCanvasResize(delay = 0) {
+            clearTimeout(resizeDebounce);
+            resizeDebounce = setTimeout(() => {
+                resizeCanvas();
+            }, delay);
+        }
+
+        const nodeTypeMetrics = {
+            input: { latency: 'Instant', cost: 'Low', reliability: 'Stable' },
+            processing: { latency: 'Moderate', cost: 'Medium', reliability: 'High' },
+            retrieval: { latency: 'Moderate', cost: 'Medium', reliability: 'High' },
+            storage: { latency: 'Medium', cost: 'Low', reliability: 'Very High' },
+            generation: { latency: 'Higher', cost: 'Higher', reliability: 'Medium' },
+            output: { latency: 'Instant', cost: 'Minimal', reliability: 'High' },
+            advanced: { latency: 'Variable', cost: 'Medium', reliability: 'Adaptive' }
+        };
+
+        const scenarios = {
+            support: {
+                label: 'Customer Support',
+                icon: '🙋',
+                recommended: 'corrective',
+                summary: 'Self-correcting answers with web fallback for live customer help.',
+                focus: ['Grades retrieved docs for relevance', 'Backfills missing info via web search', 'Ensures verified responses']
+            },
+            research: {
+                label: 'Deep Research',
+                icon: '🔬',
+                recommended: 'graph',
+                summary: 'Map relationships and entities across dense knowledge graphs.',
+                focus: ['Extract entities + relationships', 'Store knowledge in graph DB', 'Guide LLM with multi-hop chains']
+            },
+            creative: {
+                label: 'Creative Vision',
+                icon: '🎨',
+                recommended: 'multimodal',
+                summary: 'Blend text, image, and audio context for creative/media workflows.',
+                focus: ['Supports multiple input formats', 'Multi-modal embeddings and storage', 'Vision-aware LLM generation']
+            }
+        };
+
+        const architectures = {
+            naive: {
+                name: 'Naive RAG',
+                description: '🎯 The simplest RAG implementation - direct retrieval and generation',
+                purpose: 'Basic question answering from a knowledge base without complex processing',
+                useCase: '💼 Use Case: Simple FAQ systems, documentation search, basic chatbots with static knowledge',
+                metrics: { latency: 'Fast', cost: 'Low', reliability: 'Moderate' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'The starting point - user asks a question',
+                      details: { purpose: 'Receives natural language input from the user', examples: ['What is machine learning?', 'Explain quantum computing'] }
+                    },
+                    { id: 'embed', label: 'Embedding', x: 0.3, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Converts text into vectors',
+                      details: { purpose: 'Transforms queries into numerical vectors', models: ['text-embedding-ada-002', 'BERT'] }
+                    },
+                    { id: 'vectordb', label: 'Vector DB', x: 0.5, y: 0.3, color: '#f59e0b', type: 'storage',
+                      description: 'Stores document embeddings',
+                      details: { purpose: 'Fast similarity search', options: ['Pinecone', 'Weaviate', 'Chroma', 'Qdrant'] }
+                    },
+                    { id: 'prompt', label: 'Prompt Template', x: 0.7, y: 0.3, color: '#10b981', type: 'generation',
+                      description: 'Structures context for LLM',
+                      details: { purpose: 'Formats retrieved docs and query', example: 'Context: {docs}\\nQuestion: {query}\\nAnswer:' }
+                    },
+                    { id: 'llm', label: 'LLM', x: 0.7, y: 0.7, color: '#10b981', type: 'generation',
+                      description: 'Generates the final response',
+                      details: { purpose: 'Synthesizes information', models: ['GPT-4', 'Claude', 'Llama'] }
+                    },
+                    { id: 'response', label: 'Output', x: 0.9, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Final answer',
+                      details: { purpose: 'Delivers answer to user', characteristics: ['Factually grounded', 'Contextual'] }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'embed' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'prompt' },
+                    { source: 'prompt', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            },
+            multimodal: {
+                name: 'Multimodal RAG',
+                description: '🎨 Handles multiple data types - text, images, audio, video, tables',
+                purpose: 'Process and retrieve information from diverse data formats, not just text',
+                useCase: '💼 Use Case: Product catalogs with images, video search, medical imaging, document processing with charts/diagrams',
+                metrics: { latency: 'Medium', cost: 'Medium', reliability: 'High' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'Can be text, image, or voice',
+                      details: { formats: ['Text', 'Image', 'Voice'] }
+                    },
+                    { id: 'datasources', label: 'Multi-Modal Data', x: 0.3, y: 0.2, color: '#f59e0b', type: 'storage',
+                      description: 'Mixed content: PDFs, videos, audio, tables',
+                      details: { sources: ['Images', 'Videos', 'Audio', 'PDFs'], preprocessing: 'Extract frames, transcribe audio, OCR' }
+                    },
+                    { id: 'embed', label: 'Multi-Modal Embedding', x: 0.45, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Embeds different modalities',
+                      details: { models: ['CLIP (images+text)', 'Whisper (audio)', 'LayoutLM (docs)'] }
+                    },
+                    { id: 'vectordb', label: 'Vector DB', x: 0.6, y: 0.25, color: '#f59e0b', type: 'storage',
+                      description: 'Stores multi-modal embeddings',
+                      details: { features: ['Cross-modal search'] }
+                    },
+                    { id: 'prompt', label: 'Prompt Template', x: 0.75, y: 0.35, color: '#10b981', type: 'generation',
+                      description: 'Includes image refs, timestamps',
+                      details: { purpose: 'Multi-modal context formatting' }
+                    },
+                    { id: 'llm', label: 'Vision LLM', x: 0.75, y: 0.65, color: '#10b981', type: 'generation',
+                      description: 'Understands images and text',
+                      details: { models: ['GPT-4V', 'Claude 3', 'Gemini Vision'] }
+                    },
+                    { id: 'response', label: 'Output', x: 0.9, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Answer with media references',
+                      details: { includes: ['Text', 'Image refs', 'Video timestamps'] }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'embed' },
+                    { source: 'datasources', target: 'embed' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'prompt' },
+                    { source: 'prompt', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            },
+            hyde: {
+                name: 'HyDE',
+                description: '💡 Hypothetical Document Embeddings - generates ideal answer first',
+                purpose: 'Improve retrieval by searching for documents similar to an ideal answer',
+                useCase: '💼 Use Case: Complex research questions, technical Q&A, scientific literature where query-doc mismatch is high',
+                metrics: { latency: 'Medium', cost: 'Medium', reliability: 'High' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'Original question',
+                      details: { example: 'How does photosynthesis work?' }
+                    },
+                    { id: 'llm1', label: 'LLM Generate', x: 0.3, y: 0.5, color: '#10b981', type: 'generation',
+                      description: 'Generates hypothetical answer',
+                      details: { purpose: 'Create ideal answer WITHOUT retrieval', output: 'Hypothetical document (may hallucinate)' }
+                    },
+                    { id: 'hypdoc', label: 'Hypothetical Response', x: 0.5, y: 0.3, color: '#ec4899', type: 'advanced',
+                      description: 'LLM-generated answer for embedding',
+                      details: { benefit: 'Embeddings match document style' }
+                    },
+                    { id: 'embed', label: 'Embedding', x: 0.65, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Embeds hypothetical doc (not query!)',
+                      details: { keyInsight: 'Search for docs similar to answer, not question' }
+                    },
+                    { id: 'vectordb', label: 'Vector DB', x: 0.8, y: 0.3, color: '#f59e0b', type: 'storage',
+                      description: 'Real document database',
+                      details: { contains: 'Actual factual documents' }
+                    },
+                    { id: 'prompt', label: 'Prompt Template', x: 0.65, y: 0.75, color: '#10b981', type: 'generation',
+                      description: 'Combines query with REAL docs',
+                      details: { purpose: 'Final answer generation' }
+                    },
+                    { id: 'llm2', label: 'LLM Answer', x: 0.8, y: 0.75, color: '#10b981', type: 'generation',
+                      description: 'Generates from real docs',
+                      details: { input: 'Query + Real documents' }
+                    },
+                    { id: 'response', label: 'Output', x: 0.95, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Factually grounded answer',
+                      details: { based_on: 'Real documents' }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'llm1' },
+                    { source: 'llm1', target: 'hypdoc' },
+                    { source: 'hypdoc', target: 'embed' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'prompt' },
+                    { source: 'query', target: 'prompt' },
+                    { source: 'prompt', target: 'llm2' },
+                    { source: 'llm2', target: 'response' }
+                ]
+            },
+            corrective: {
+                name: 'Corrective RAG',
+                description: '✅ Self-correcting - evaluates quality and searches web if needed',
+                purpose: 'Self-correct when internal knowledge base lacks info or has poor relevance',
+                useCase: '💼 Use Case: Customer support (fallback to web), news/current events, combining internal KB with web search',
+                metrics: { latency: 'Medium', cost: 'Medium', reliability: 'High' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'User question',
+                      details: { purpose: 'Input query' }
+                    },
+                    { id: 'embed', label: 'Embedding', x: 0.25, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Embed query',
+                      details: { purpose: 'Vector conversion' }
+                    },
+                    { id: 'vectordb', label: 'Vector DB', x: 0.4, y: 0.3, color: '#f59e0b', type: 'storage',
+                      description: 'Internal knowledge base',
+                      details: { contains: 'Company docs, internal data' }
+                    },
+                    { id: 'grader', label: 'Relevance Grader', x: 0.55, y: 0.5, color: '#ec4899', type: 'advanced',
+                      description: 'LLM judges doc quality',
+                      details: { purpose: 'Quality control', methods: ['LLM as judge', 'Relevance scoring'] }
+                    },
+                    { id: 'websearch', label: 'Search Web', x: 0.55, y: 0.75, color: '#3b82f6', type: 'input',
+                      description: 'Fallback to web search',
+                      details: { trigger: 'Low relevance score', providers: ['Google', 'Tavily', 'SerpAPI'] }
+                    },
+                    { id: 'correctinfo', label: 'Corrected Info', x: 0.7, y: 0.6, color: '#10b981', type: 'generation',
+                      description: 'Best available info',
+                      details: { source: 'Internal docs OR web' }
+                    },
+                    { id: 'prompt', label: 'Prompt Template', x: 0.8, y: 0.4, color: '#10b981', type: 'generation',
+                      description: 'Formats corrected context'
+                    },
+                    { id: 'llm', label: 'LLM', x: 0.8, y: 0.7, color: '#10b981', type: 'generation',
+                      description: 'Generates from best source'
+                    },
+                    { id: 'response', label: 'Output', x: 0.95, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Verified answer',
+                      details: { quality: 'Self-corrected' }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'embed' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'grader' },
+                    { source: 'grader', target: 'correctinfo' },
+                    { source: 'grader', target: 'websearch' },
+                    { source: 'websearch', target: 'correctinfo' },
+                    { source: 'correctinfo', target: 'prompt' },
+                    { source: 'prompt', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            },
+            graph: {
+                name: 'Graph RAG',
+                description: '🕸️ Knowledge graphs for entity relationships and multi-hop reasoning',
+                purpose: 'Answer complex questions requiring understanding of connections between entities',
+                useCase: '💼 Use Case: Research across papers, company org charts, supply chain analysis, "who knows who" queries',
+                metrics: { latency: 'Medium', cost: 'Medium', reliability: 'Very High' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'Question needing relational reasoning',
+                      details: { examples: ['Who are competitors of companies founded by X?'] }
+                    },
+                    { id: 'embed', label: 'Embedding', x: 0.25, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Embeds query'
+                    },
+                    { id: 'graphgen', label: 'Graph Generator', x: 0.35, y: 0.25, color: '#ec4899', type: 'advanced',
+                      description: 'Builds knowledge graph',
+                      details: { extracts: ['Entities (nodes)', 'Relationships (edges)'], methods: ['NER', 'Relation extraction'] }
+                    },
+                    { id: 'datasources', label: 'Data Sources', x: 0.25, y: 0.15, color: '#f59e0b', type: 'storage',
+                      description: 'Raw documents',
+                      details: { types: ['PDFs', 'Articles', 'Databases'] }
+                    },
+                    { id: 'vectordb', label: 'Vector DB', x: 0.5, y: 0.35, color: '#f59e0b', type: 'storage',
+                      description: 'Semantic search',
+                      details: { purpose: 'Find relevant entities' }
+                    },
+                    { id: 'graphdb', label: 'Graph DB', x: 0.5, y: 0.65, color: '#f59e0b', type: 'storage',
+                      description: 'Knowledge graph storage',
+                      details: { databases: ['Neo4j', 'Neptune'], structure: 'Nodes + edges' }
+                    },
+                    { id: 'prompt', label: 'Prompt Template', x: 0.75, y: 0.4, color: '#10b981', type: 'generation',
+                      description: 'Includes graph paths'
+                    },
+                    { id: 'llm', label: 'LLM', x: 0.75, y: 0.7, color: '#10b981', type: 'generation',
+                      description: 'Reasons over graph',
+                      details: { purpose: 'Multi-hop reasoning' }
+                    },
+                    { id: 'response', label: 'Output', x: 0.95, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Answer with relationships',
+                      details: { includes: ['Answer', 'Relationship chains'] }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'embed' },
+                    { source: 'datasources', target: 'graphgen' },
+                    { source: 'graphgen', target: 'graphdb' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'graphdb' },
+                    { source: 'graphdb', target: 'prompt' },
+                    { source: 'prompt', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            },
+            hybrid: {
+                name: 'Hybrid RAG',
+                description: '🔀 Combines vector search AND graph database for dual context',
+                purpose: 'Get both semantic similarity (vectors) and structural relationships (graphs)',
+                useCase: '💼 Use Case: Enterprise search (docs + org structure), e-commerce (products + relationships), research (papers + citations)',
+                metrics: { latency: 'Medium', cost: 'Medium', reliability: 'High' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'User question'
+                    },
+                    { id: 'embed', label: 'Embedding', x: 0.3, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Query embedding'
+                    },
+                    { id: 'graphgen', label: 'Graph Generator', x: 0.45, y: 0.25, color: '#ec4899', type: 'advanced',
+                      description: 'Maintains knowledge graph',
+                      details: { continuous: 'Updates as new docs arrive' }
+                    },
+                    { id: 'datasources', label: 'Data Sources', x: 0.3, y: 0.15, color: '#f59e0b', type: 'storage',
+                      description: 'Raw documents',
+                      details: { feeds: ['Vector DB', 'Graph DB'] }
+                    },
+                    { id: 'vectordb', label: 'Vector DB\nContext 1', x: 0.6, y: 0.35, color: '#f59e0b', type: 'storage',
+                      description: 'Semantic search results',
+                      details: { provides: 'Similar documents by content' }
+                    },
+                    { id: 'graphdb', label: 'Graph DB\nContext 2', x: 0.6, y: 0.65, color: '#f59e0b', type: 'storage',
+                      description: 'Related entities',
+                      details: { provides: 'Connected entities, paths' }
+                    },
+                    { id: 'prompt', label: 'Prompt Template', x: 0.8, y: 0.4, color: '#10b981', type: 'generation',
+                      description: 'Merges both contexts',
+                      details: { combines: 'Vector + Graph results' }
+                    },
+                    { id: 'llm', label: 'LLM', x: 0.8, y: 0.7, color: '#10b981', type: 'generation',
+                      description: 'Generates from dual context'
+                    },
+                    { id: 'response', label: 'Output', x: 0.95, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Comprehensive answer',
+                      details: { quality: 'Best of both worlds' }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'embed' },
+                    { source: 'datasources', target: 'graphgen' },
+                    { source: 'graphgen', target: 'graphdb' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'prompt' },
+                    { source: 'graphdb', target: 'prompt' },
+                    { source: 'prompt', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            },
+            adaptive: {
+                name: 'Adaptive RAG',
+                description: '🎯 Intelligently routes queries to different strategies based on complexity',
+                purpose: 'Choose the right RAG approach for each query type automatically',
+                useCase: '💼 Use Case: Production systems with diverse queries, cost optimization, quality-speed tradeoffs',
+                metrics: { latency: 'Dynamic', cost: 'Optimized', reliability: 'High' },
+                nodes: [
+                    { id: 'query', label: 'User Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'Incoming query'
+                    },
+                    { id: 'analyzer', label: 'Query Analyzer', x: 0.3, y: 0.5, color: '#ec4899', type: 'advanced',
+                      description: 'Classifies query complexity',
+                      details: { analyzes: ['Complexity', 'Domain', 'Reasoning depth'], outputs: 'Route decision' }
+                    },
+                    { id: 'multistep', label: 'Multi-Step\nChain', x: 0.5, y: 0.2, color: '#8b5cf6', type: 'retrieval',
+                      description: 'For complex queries',
+                      details: { when: 'Complex reasoning needed' }
+                    },
+                    { id: 'reasoning', label: 'Reasoning\nEngine', x: 0.65, y: 0.3, color: '#ec4899', type: 'advanced',
+                      description: 'Advanced reasoning',
+                      details: { capabilities: ['Multi-hop', 'Synthesis'] }
+                    },
+                    { id: 'direct', label: 'Direct', x: 0.5, y: 0.5, color: '#8b5cf6', type: 'retrieval',
+                      description: 'Simple semantic search',
+                      details: { when: 'Simple factual queries' }
+                    },
+                    { id: 'datasources', label: 'Data Sources', x: 0.3, y: 0.15, color: '#f59e0b', type: 'storage',
+                      description: 'Knowledge base'
+                    },
+                    { id: 'embed', label: 'Embedding', x: 0.5, y: 0.8, color: '#8b5cf6', type: 'processing',
+                      description: 'Vector encoding'
+                    },
+                    { id: 'vectordb', label: 'Vector DB', x: 0.65, y: 0.8, color: '#f59e0b', type: 'storage',
+                      description: 'Vector storage'
+                    },
+                    { id: 'llm', label: 'LLM', x: 0.85, y: 0.5, color: '#10b981', type: 'generation',
+                      description: 'Final generation'
+                    },
+                    { id: 'response', label: 'Output', x: 0.95, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Optimized response',
+                      details: { benefit: 'Right strategy per query' }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'analyzer' },
+                    { source: 'analyzer', target: 'multistep' },
+                    { source: 'analyzer', target: 'direct' },
+                    { source: 'analyzer', target: 'embed' },
+                    { source: 'datasources', target: 'multistep' },
+                    { source: 'datasources', target: 'direct' },
+                    { source: 'multistep', target: 'reasoning' },
+                    { source: 'reasoning', target: 'llm' },
+                    { source: 'direct', target: 'llm' },
+                    { source: 'embed', target: 'vectordb' },
+                    { source: 'vectordb', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            },
+            agentic: {
+                name: 'Agentic RAG',
+                description: '🤖 AI agents with memory, planning, and multiple tools for complex workflows',
+                purpose: 'Handle multi-step tasks requiring reasoning, tool use, and decision making',
+                useCase: '💼 Use Case: Research assistants, code analysis, data analysis, workflows requiring multiple API calls',
+                metrics: { latency: 'Higher', cost: 'Higher', reliability: 'Very High' },
+                nodes: [
+                    { id: 'query', label: 'Complex Query', x: 0.1, y: 0.5, color: '#3b82f6', type: 'input',
+                      description: 'Multi-step question',
+                      details: { examples: ['Compare A and B', 'Research X and synthesize'] }
+                    },
+                    { id: 'agent', label: 'Agent', x: 0.3, y: 0.5, color: '#ec4899', type: 'advanced',
+                      description: 'Reasoning engine',
+                      details: { frameworks: ['ReAct', 'AutoGPT', 'LangGraph'], capabilities: ['Task decomposition', 'Self-correction'] }
+                    },
+                    { id: 'memory', label: 'Short/Long\nTerm Memory', x: 0.25, y: 0.25, color: '#f59e0b', type: 'storage',
+                      description: 'Conversation history',
+                      details: { types: ['Short-term', 'Long-term', 'Working memory'] }
+                    },
+                    { id: 'planning', label: 'ReACT / CoT\nPlanning', x: 0.4, y: 0.25, color: '#10b981', type: 'generation',
+                      description: 'Breaks down complex queries',
+                      details: { methods: ['Chain-of-Thought', 'ReWOO'] }
+                    },
+                    { id: 'agent1', label: 'Agent 1', x: 0.6, y: 0.25, color: '#10b981', type: 'generation',
+                      description: 'Sub-agent'
+                    },
+                    { id: 'agent2', label: 'Agent 2', x: 0.6, y: 0.5, color: '#8b5cf6', type: 'processing',
+                      description: 'Sub-agent'
+                    },
+                    { id: 'agent3', label: 'Agent 3', x: 0.6, y: 0.75, color: '#f59e0b', type: 'storage',
+                      description: 'Sub-agent'
+                    },
+                    { id: 'servers', label: 'MCP Servers', x: 0.8, y: 0.15, color: '#8b5cf6', type: 'retrieval',
+                      description: 'Local/Cloud data',
+                      details: { sources: ['Local Data', 'Search', 'Cloud'] }
+                    },
+                    { id: 'llm', label: 'LLM', x: 0.7, y: 0.65, color: '#10b981', type: 'generation',
+                      description: 'Synthesizes from tools',
+                      details: { pattern: 'ReAct (Reason + Act)' }
+                    },
+                    { id: 'response', label: 'Output', x: 0.9, y: 0.5, color: '#10b981', type: 'output',
+                      description: 'Comprehensive answer',
+                      details: { includes: ['Answer', 'Reasoning', 'Sources', 'Tool calls'] }
+                    }
+                ],
+                edges: [
+                    { source: 'query', target: 'agent' },
+                    { source: 'agent', target: 'memory' },
+                    { source: 'agent', target: 'planning' },
+                    { source: 'planning', target: 'agent1' },
+                    { source: 'planning', target: 'agent2' },
+                    { source: 'planning', target: 'agent3' },
+                    { source: 'agent1', target: 'servers' },
+                    { source: 'agent2', target: 'servers' },
+                    { source: 'agent3', target: 'servers' },
+                    { source: 'servers', target: 'llm' },
+                    { source: 'agent1', target: 'llm' },
+                    { source: 'agent2', target: 'llm' },
+                    { source: 'agent3', target: 'llm' },
+                    { source: 'memory', target: 'llm' },
+                    { source: 'llm', target: 'response' }
+                ]
+            }
+        };
+
+        function loadArchitecture(archName) {
+            const arch = architectures[archName];
+            nodes = arch.nodes.map(n => ({
+                ...n,
+                size: 30,
+                connections: []
+            }));
+
+            // Calculate connections
+            arch.edges.forEach(edge => {
+                const sourceNode = nodes.find(n => n.id === edge.source);
+                const targetNode = nodes.find(n => n.id === edge.target);
+                if (sourceNode && !sourceNode.connections.includes(edge.target)) {
+                    sourceNode.connections.push(edge.target);
+                }
+            });
+
+            edges = arch.edges.map(e => ({
+                source: nodes.find(n => n.id === e.source),
+                target: nodes.find(n => n.id === e.target)
+            }));
+
+            initParticles();
+        }
+
+        function getNodePosition(node) {
+            return {
+                x: node.x * width,
+                y: node.y * height
+            };
+        }
+
+        function drawNode(node) {
+            const pos = getNodePosition(node);
+            const isHovered = node === hoveredNode;
+            const isSelected = node === selectedNode;
+            const size = node.size + (isHovered ? 8 : 0) + (isSelected ? 12 : 0);
+
+            // Glow effect
+            if (isHovered || isSelected) {
+                const gradient = ctx.createRadialGradient(pos.x, pos.y, size, pos.x, pos.y, size * 2);
+                gradient.addColorStop(0, node.color + '40');
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Main circle
+            ctx.fillStyle = node.color;
+            ctx.shadowColor = node.color;
+            ctx.shadowBlur = isSelected ? 30 : (isHovered ? 20 : 10);
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Inner circle
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Label
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${isSelected ? '14px' : '12px'} 'Inter', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            
+            const lines = node.label.split(' ');
+            const lineHeight = isSelected ? 16 : 14;
+            const startY = pos.y + size + 10;
+            
+            lines.forEach((line, i) => {
+                // Text shadow for readability
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(line, pos.x, startY + i * lineHeight);
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        function drawEdge(edge) {
+            const sourcePos = getNodePosition(edge.source);
+            const targetPos = getNodePosition(edge.target);
+            
+            const dx = targetPos.x - sourcePos.x;
+            const dy = targetPos.y - sourcePos.y;
+            const angle = Math.atan2(dy, dx);
+            
+            // Offset start/end points by node size
+            const startX = sourcePos.x + Math.cos(angle) * edge.source.size;
+            const startY = sourcePos.y + Math.sin(angle) * edge.source.size;
+            const endX = targetPos.x - Math.cos(angle) * edge.target.size;
+            const endY = targetPos.y - Math.sin(angle) * edge.target.size;
+
+            // Curved path
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
+            const curveX = midX + dy * 0.1;
+            const curveY = midY - dx * 0.1;
+
+            const isHighlighted = highlightedEdges.has(edge);
+            const glowStrength = isHighlighted ? 0.5 + 0.4 * highlightPulse : 0.3;
+            ctx.strokeStyle = isHighlighted ? `rgba(59, 255, 196, ${glowStrength})` : 'rgba(100, 150, 255, 0.3)';
+            ctx.lineWidth = isHighlighted ? 3.5 : 2;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.quadraticCurveTo(curveX, curveY, endX, endY);
+            ctx.stroke();
+            if (isHighlighted) {
+                ctx.shadowColor = 'rgba(59, 255, 196, 0.7)';
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw arrow
+            const arrowSize = 8;
+            const arrowAngle = Math.atan2(endY - curveY, endX - curveX);
+            ctx.fillStyle = isHighlighted ? 'rgba(59, 255, 196, 0.9)' : 'rgba(100, 150, 255, 0.5)';
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - arrowSize * Math.cos(arrowAngle - Math.PI / 6),
+                endY - arrowSize * Math.sin(arrowAngle - Math.PI / 6)
+            );
+            ctx.lineTo(
+                endX - arrowSize * Math.cos(arrowAngle + Math.PI / 6),
+                endY - arrowSize * Math.sin(arrowAngle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        class Particle {
+            constructor(edge) {
+                this.edge = edge;
+                this.progress = 0;
+                this.speed = 0.3 + Math.random() * 0.5;
+                this.size = 3 + Math.random() * 2;
+                this.color = edge.source.color;
+            }
+            
+            update() {
+                this.progress += this.speed * 0.01;
+                if (this.progress > 1) {
+                    this.progress = 0;
+                }
+            }
+            
+            draw() {
+                const sourcePos = getNodePosition(this.edge.source);
+                const targetPos = getNodePosition(this.edge.target);
+                const dx = targetPos.x - sourcePos.x;
+                const dy = targetPos.y - sourcePos.y;
+                const midX = sourcePos.x + dx * 0.5;
+                const midY = sourcePos.y + dy * 0.5;
+                const curveX = midX + dy * 0.1;
+                const curveY = midY - dx * 0.1;
+                
+                // Calculate position along curve
+                const t = this.progress;
+                const x = (1-t)*(1-t)*sourcePos.x + 2*(1-t)*t*curveX + t*t*targetPos.x;
+                const y = (1-t)*(1-t)*sourcePos.y + 2*(1-t)*t*curveY + t*t*targetPos.y;
+                
+                // Draw particle
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, this.size * 2.5);
+                gradient.addColorStop(0, this.color + 'ff');
+                gradient.addColorStop(0.5, this.color + '80');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, this.size * 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            edges.forEach(edge => {
+                for (let i = 0; i < 3; i++) {
+                    const particle = new Particle(edge);
+                    particle.progress = Math.random();
+                    particles.push(particle);
+                }
+            });
+        }
+
+        function toggleSidebar(forceOpen) {
+            const shouldOpen = typeof forceOpen === 'boolean'
+                ? forceOpen
+                : infoPanelEl.classList.contains('collapsed');
+            infoPanelEl.classList.toggle('collapsed', !shouldOpen);
+            sidebarToggleBtn.classList.toggle('visible', !shouldOpen);
+            mainAreaEl.classList.toggle('sidebar-collapsed', !shouldOpen);
+            scheduleCanvasResize(10);
+        }
+
+        function updateInfoPanel(node) {
+            toggleSidebar(true);
+            const panel = infoPanelEl;
+            const title = document.getElementById('component-title');
+            const type = document.getElementById('component-type');
+            const description = document.getElementById('component-description');
+            const details = document.getElementById('component-details');
+            
+            if (node) {
+                title.textContent = node.label;
+                
+                // Set type badge
+                const typeColors = {
+                    'input': { bg: '#3b82f6', text: 'Input Layer' },
+                    'processing': { bg: '#8b5cf6', text: 'Processing' },
+                    'retrieval': { bg: '#8b5cf6', text: 'Retrieval' },
+                    'storage': { bg: '#f59e0b', text: 'Storage/Database' },
+                    'generation': { bg: '#10b981', text: 'Generation' },
+                    'output': { bg: '#10b981', text: 'Output' },
+                    'advanced': { bg: '#ec4899', text: 'Advanced Feature' }
+                };
+                
+                const typeInfo = typeColors[node.type];
+                type.textContent = typeInfo.text;
+                type.style.background = typeInfo.bg + '30';
+                type.style.border = `1px solid ${typeInfo.bg}`;
+                type.style.color = typeInfo.bg;
+                
+                description.textContent = node.description;
+                
+                // Build details section
+                let detailsHTML = '';
+                
+                if (node.details) {
+                    detailsHTML += '<div class="info-section">';
+                    detailsHTML += '<h3>Key Details</h3><ul>';
+                    
+                    for (const [key, value] of Object.entries(node.details)) {
+                        if (Array.isArray(value)) {
+                            detailsHTML += `<li><strong>${formatKey(key)}:</strong> ${value.join(', ')}</li>`;
+                        } else {
+                            detailsHTML += `<li><strong>${formatKey(key)}:</strong> ${value}</li>`;
+                        }
+                    }
+                    
+                    detailsHTML += '</ul></div>';
+                }
+                
+                // Show connections
+                if (node.connections.length > 0) {
+                    const connectedNodes = node.connections.map(id => 
+                        nodes.find(n => n.id === id)?.label
+                    ).filter(Boolean);
+                    
+                    detailsHTML += `
+                        <div class="info-section">
+                            <h3>Connects To</h3>
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                                ${connectedNodes.map(name => 
+                                    `<span class="connection-badge">${name}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                const metricSource = node.metrics || nodeTypeMetrics[node.type];
+                if (metricSource) {
+                    detailsHTML += `
+                        <div class="info-section">
+                            <h3>Performance Snapshot</h3>
+                            <ul>
+                                <li><strong>Latency:</strong> ${metricSource.latency}</li>
+                                <li><strong>Cost:</strong> ${metricSource.cost}</li>
+                                <li><strong>Reliability:</strong> ${metricSource.reliability}</li>
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                details.innerHTML = detailsHTML;
+                panel.classList.add('active');
+            } else {
+                // Show architecture description when no node is selected
+                const arch = architectures[currentArchitecture];
+                if (arch) {
+                    title.textContent = arch.name;
+                    type.textContent = 'Architecture Overview';
+                    type.style.background = '#a78bfa30';
+                    type.style.border = '1px solid #a78bfa';
+                    type.style.color = '#a78bfa';
+                    description.textContent = arch.description.replace(/^[🎯💡✅🕸️🔀🎯🤖🎨]\s*/, '');
+                    
+                    details.innerHTML = `
+                        <div class="info-section">
+                            <h3>Purpose</h3>
+                            <p style="color: #e0e0e0; line-height: 1.6;">${arch.purpose}</p>
+                        </div>
+                        <div class="info-section">
+                            <h3>Use Case</h3>
+                            <p style="color: #e0e0e0; line-height: 1.6;">${arch.useCase.replace('💼 Use Case: ', '')}</p>
+                        </div>
+                        <div class="info-section">
+                            <p style="color: #9ca3af; font-size: 13px; font-style: italic;">
+                                Click on any component to see detailed information about that step in the pipeline.
+                            </p>
+                        </div>
+                    `;
+                    if (arch.metrics) {
+                        details.innerHTML += `
+                            <div class="info-section">
+                                <h3>Architecture Metrics</h3>
+                                <ul>
+                                    <li><strong>Latency:</strong> ${arch.metrics.latency}</li>
+                                    <li><strong>Cost:</strong> ${arch.metrics.cost}</li>
+                                    <li><strong>Reliability:</strong> ${arch.metrics.reliability}</li>
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    panel.classList.add('active');
+                } else {
+                    panel.classList.remove('active');
+                }
+            }
+        }
+
+        function updateMetricsPanel() {
+            if (!metricsPanelEl) return;
+            const arch = architectures[currentArchitecture];
+            if (!arch) {
+                metricsPanelEl.innerHTML = '<h3>Performance Stats</h3><div class="metric-row"><span>Latency</span><span class="metric-value">N/A</span></div>';
+                return;
+            }
+            const metrics = arch.metrics || { latency: 'N/A', cost: 'N/A', reliability: 'N/A' };
+            metricsPanelEl.innerHTML = `
+                <h3>${arch.name} Metrics</h3>
+                <div class="metric-row"><span>Latency</span><span class="metric-value">${metrics.latency}</span></div>
+                <div class="metric-row"><span>Cost</span><span class="metric-value">${metrics.cost}</span></div>
+                <div class="metric-row"><span>Reliability</span><span class="metric-value">${metrics.reliability}</span></div>
+            `;
+        }
+
+        function formatKey(key) {
+            return key.split(/(?=[A-Z])/).map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+        }
+
+        function findNodeAtPosition(x, y) {
+            for (const node of nodes) {
+                const pos = getNodePosition(node);
+                const dx = x - pos.x;
+                const dy = y - pos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= node.size + 10) {
+                    return node;
+                }
+            }
+            return null;
+        }
+
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const node = findNodeAtPosition(x, y);
+            if (node !== hoveredNode) {
+                hoveredNode = node;
+                canvas.style.cursor = node ? 'pointer' : 'default';
+            }
+        }
+
+        function handleMouseClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const node = findNodeAtPosition(x, y);
+            if (node) {
+                selectedNode = node;
+                updateInfoPanel(node);
+                updateHighlightedEdges(node);
+            } else {
+                selectedNode = null;
+                updateInfoPanel(null);
+                updateHighlightedEdges(null);
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            if (isAnimating) {
+                time++;
+            }
+            
+            highlightPhase += 0.02;
+            if (highlightPhase > Math.PI * 2) {
+                highlightPhase = 0;
+            }
+            highlightPulse = (Math.sin(highlightPhase) + 1) / 2;
+            
+            // Draw edges
+            edges.forEach(edge => drawEdge(edge));
+            
+            // Update and draw particles
+            if (isAnimating) {
+                particles.forEach(particle => {
+                    particle.update();
+                    particle.draw();
+                });
+            }
+            
+            // Draw nodes
+            nodes.forEach(node => drawNode(node));
+            
+            requestAnimationFrame(animate);
+        }
+
+        function switchArchitecture(archName) {
+            currentArchitecture = archName;
+            loadArchitecture(archName);
+            
+            // Update button states
+            archButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(archName.toLowerCase()));
+            });
+            
+            // Reset selection
+            selectedNode = null;
+            hoveredNode = null;
+            updateInfoPanel(null);
+            updateHighlightedEdges(null);
+            updateMetricsPanel();
+        }
+
+        function toggleAnimation(btn) {
+            isAnimating = !isAnimating;
+            if (btn) {
+                btn.textContent = isAnimating ? '⏸ Pause Flow' : '▶ Start Flow';
+                btn.classList.toggle('active', isAnimating);
+            }
+        }
+
+        function setComparisonMode(enabled) {
+            comparisonMode = enabled;
+            const indicator = document.getElementById('comparison-mode');
+            indicator.classList.toggle('active', comparisonMode);
+
+            if (comparisonTableEl) {
+                comparisonTableEl.classList.toggle('active', comparisonMode);
+                if (comparisonMode) {
+                    renderComparisonTable();
+                }
+            }
+
+            if (comparisonButtonEl) {
+                comparisonButtonEl.classList.toggle('active', comparisonMode);
+            }
+        }
+
+        function toggleComparison() {
+            setComparisonMode(!comparisonMode);
+        }
+
+        function selectScenario(key) {
+            if (!scenarioInfoEl) return;
+            if (activeScenario === key) {
+                activeScenario = null;
+                scenarioButtons.forEach(btn => btn.classList.remove('active'));
+                scenarioInfoEl.innerHTML = scenarioInfoDefault;
+                scenarioInfoEl.classList.add('active');
+                return;
+            }
+            
+            activeScenario = key;
+            scenarioButtons.forEach(btn => {
+                const isActive = btn.dataset.scenario === key;
+                btn.classList.toggle('active', isActive);
+            });
+            
+            const scenario = scenarios[key];
+            if (scenario) {
+                scenarioInfoEl.classList.add('active');
+                scenarioInfoEl.innerHTML = `
+                    <h3>${scenario.icon} ${scenario.label}</h3>
+                    <p>${scenario.summary}</p>
+                    <p style="margin-top:8px;"><strong>Recommended:</strong> ${architectures[scenario.recommended]?.name || 'N/A'}</p>
+                    <ul>
+                        ${scenario.focus.map(point => `<li>${point}</li>`).join('')}
+                    </ul>
+                `;
+                if (scenario.recommended) {
+                    switchArchitecture(scenario.recommended);
+                }
+            }
+        }
+
+        function stripLeadingEmoji(text = '') {
+            return text.replace(/^[^a-zA-Z0-9]+(\s|:)+/u, '');
+        }
+
+        function updateHighlightedEdges(node) {
+            highlightedEdges.clear();
+            if (!node) return;
+            
+            const forwardQueue = [node.id];
+            const visitedForward = new Set([node.id]);
+            while (forwardQueue.length) {
+                const current = forwardQueue.shift();
+                edges.forEach(edge => {
+                    if (edge.source.id === current) {
+                        highlightedEdges.add(edge);
+                        if (!visitedForward.has(edge.target.id)) {
+                            visitedForward.add(edge.target.id);
+                            forwardQueue.push(edge.target.id);
+                        }
+                    }
+                });
+            }
+            
+            const backwardQueue = [node.id];
+            const visitedBackward = new Set([node.id]);
+            while (backwardQueue.length) {
+                const current = backwardQueue.shift();
+                edges.forEach(edge => {
+                    if (edge.target.id === current) {
+                        highlightedEdges.add(edge);
+                        if (!visitedBackward.has(edge.source.id)) {
+                            visitedBackward.add(edge.source.id);
+                            backwardQueue.push(edge.source.id);
+                        }
+                    }
+                });
+            }
+        }
+
+        function renderComparisonTable() {
+            if (!comparisonTableEl) return;
+
+            const rows = Object.values(architectures).map(arch => {
+                const useCase = (arch.useCase || '')
+                    .replace(/^[^a-zA-Z0-9]+(\s|:)+/u, '')
+                    .replace(/^Use Case:\s*/i, '');
+                const description = stripLeadingEmoji(arch.description || '');
+                return `
+                    <tr>
+                        <td>
+                            <div class="arch-label">${arch.name}</div>
+                            <div class="arch-use-case">${useCase}</div>
+                        </td>
+                        <td>${arch.purpose}</td>
+                        <td>${description}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            comparisonTableEl.innerHTML = `
+                <div class="comparison-table-header">
+                    <div>
+                        <h3>Architecture Comparison</h3>
+                        <p>Key differences, goals, and ideal scenarios for every RAG variant.</p>
+                    </div>
+                    <button type="button" class="comparison-close" onclick="setComparisonMode(false)">✕ Close</button>
+                </div>
+                <div class="comparison-table-body">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 28%;">Architecture</th>
+                                <th style="width: 36%;">Primary Purpose</th>
+                                <th style="width: 36%;">Key Differentiator</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function resetView() {
+            selectedNode = null;
+            hoveredNode = null;
+            updateInfoPanel(null);
+            updateHighlightedEdges(null);
+        }
+
+        // Initialize
+        window.addEventListener('resize', () => {
+            scheduleCanvasResize(0);
+        });
+        
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('click', handleMouseClick);
+        
+        resizeCanvas();
+        loadArchitecture('naive');
+        updateInfoPanel(null); // Show architecture description on load
+        updateMetricsPanel();
+        animate();
+    </script>
+</body>
+</html>
